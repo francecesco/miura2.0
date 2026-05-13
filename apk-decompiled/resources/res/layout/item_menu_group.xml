@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:background="#ff222222"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <TextView
+        android:textStyle="bold"
+        android:textColor="@android:color/white"
+        android:gravity="center"
+        android:id="@+id/text_menu_group"
+        android:padding="6dp"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="MENU"
+        android:layout_weight="1"/>
+</LinearLayout>

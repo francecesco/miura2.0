@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:background="@android:color/white"
+    android:clickable="true"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <GridView
+        android:gravity="center"
+        android:id="@+id/grid_timer_details"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:horizontalSpacing="10dp"
+        android:verticalSpacing="10dp"
+        android:stretchMode="columnWidth"
+        android:columnWidth="90dp"
+        android:numColumns="7"
+        android:layout_weight="1"/>
+    <View
+        android:background="@android:color/black"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_margin="2dp"/>
+    <GridView
+        android:gravity="center"
+        android:layout_gravity="bottom"
+        android:id="@+id/grid_timer_groups"
+        android:layout_width="match_parent"
+        android:layout_height="110dp"
+        android:horizontalSpacing="2dp"
+        android:verticalSpacing="2dp"
+        android:stretchMode="columnWidth"
+        android:columnWidth="90dp"
+        android:numColumns="4"
+        android:layout_weight="0"/>
+</LinearLayout>

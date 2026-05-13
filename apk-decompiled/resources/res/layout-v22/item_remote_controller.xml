@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:padding="6dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <TextView
+        android:textColor="@android:color/black"
+        android:gravity="center_vertical"
+        android:id="@+id/text_remote_controller_name"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_weight="1"
+        style="@style/Text.TopMainItems"/>
+    <ImageView
+        android:layout_gravity="center_vertical"
+        android:id="@+id/image_gsm_enabled"
+        android:visibility="gone"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_marginRight="6dp"
+        android:scaleType="fitStart"
+        android:layout_weight="0"/>
+    <Switch
+        android:enabled="false"
+        android:id="@+id/switch_remote_controller"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0"
+        android:thumbTint="@color/tervis_tint"
+        android:trackTint="@color/tervis_blues"/>
+</LinearLayout>

@@ -1,0 +1,12 @@
+{
+  "name": "miura2",
+  "version": "0.1.0",
+  "description": "Self-hosted PWA replica of Miura Tervis alarm app",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test backend/test/protocol.test.js backend/test/connection.test.js backend/test/session.test.js"
+  }
+}

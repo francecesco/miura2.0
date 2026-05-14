@@ -1,0 +1,24 @@
+# Dipendenze
+node_modules/
+
+# Variabili d'ambiente (contengono IP, PIN e credenziali reali)
+.env
+.env.local
+.env.*.local
+
+# APK originale (binario proprietario, non redistributibile)
+miura.apk
+
+# Sorgenti decompilate (binari + codice proprietario)
+apk-decompiled/
+
+# Directory di lavoro Claude Code (conversazioni e memoria locale)
+.claude/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
+*.swo

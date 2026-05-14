@@ -262,7 +262,7 @@ class Session extends EventEmitter {
       this.#pending = null;
       reject(new Error('command timeout'));
       this.#pumpQueue();
-    }, CMD_TIMEOUT_MS);
+    }, CMD_TIMEOUT_MS).unref();
 
     this.#pending = { expectCmd, expectSubs, resolve, reject, decode, timerId };
     this.#sendFrame(frame);
@@ -435,7 +435,7 @@ class Session extends EventEmitter {
         this.#conn.send(buildFrame(0x01, 0x02, Buffer.alloc(0)));
         this.#resetKeepAlive();
       }
-    }, KEEPALIVE_MS);
+    }, KEEPALIVE_MS).unref();
   }
 }
 

@@ -192,7 +192,7 @@ describe('Session — login fallito', () => {
     const session = new Session(conn, TEST_PIN);
 
     const failedP  = waitFor(session, 'login-failed');
-    session.connect();
+    session.connect().catch(() => {}); // rejection attesa via assert.rejects non necessaria qui
     conn.emit('state', 'connected');
     conn.emit('frame', serverFrame(0x01, 0x80, [0x00]));
 
@@ -445,7 +445,7 @@ describe('Session — getSysinfo / getZoneBlock / getText', () => {
   test('getZoneBlock con isLast=true → flag=0x0F nel frame', async () => {
     const { conn, session } = await readySession();
 
-    session.getZoneBlock(7, 7, true);
+    session.getZoneBlock(7, 7, true).catch(() => {}); // risposta non emessa in questo test
     await Promise.resolve();
 
     const sent = parseSent(conn.sent.at(-1));
@@ -481,7 +481,7 @@ describe('Session — getSysinfo / getZoneBlock / getText', () => {
   test('getText con ID > 255 viene codificato correttamente in LE16', async () => {
     const { conn, session } = await readySession();
 
-    session.getText(3, 0x0102); // ZONE, id=258
+    session.getText(3, 0x0102).catch(() => {}); // risposta non emessa in questo test
     await Promise.resolve();
 
     const sent = parseSent(conn.sent.at(-1));

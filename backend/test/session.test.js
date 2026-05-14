@@ -373,3 +373,118 @@ describe('Session — coda comandi e reconnect', () => {
     assert.strictEqual(forwarded.sub, 0x88);
   });
 });
+
+// ─── Suite 6 — Nuovi comandi ──────────────────────────────────────────────────
+
+describe('Session — getSysinfo / getZoneBlock / getText', () => {
+  // Helper: porta la sessione a READY e restituisce { conn, session }
+  async function readySession() {
+    const conn    = new MockConnection();
+    const session = new Session(conn, TEST_PIN);
+    const p = session.connect();
+    doLogin(conn);
+    await p;
+    return { conn, session };
+  }
+
+  test('getSysinfo() invia CMD=0x0F SUB=0x01 e decodifica la risposta', async () => {
+    const { conn, session } = await readySession();
+
+    const sysinfoP = session.getSysinfo();
+    await Promise.resolve();
+
+    // Verifica il frame inviato
+    const sent = parseSent(conn.sent.at(-1));
+    assert.strictEqual(sent.cmd, 0x0F);
+    assert.strictEqual(sent.sub, 0x01);
+
+    // Risposta: flags1=0x01 (armato), fw=1.2, battery=4, name="TIM"
+    const respData = Buffer.concat([
+      Buffer.from([0x01, 0x00, 0x00, 0x01, 0x02, 0x04]),
+      Buffer.from('TIM\0', 'ascii'),
+    ]);
+    conn.emit('frame', serverFrame(0x0F, 0x80, respData));
+
+    const result = await sysinfoP;
+    assert.strictEqual(result.armed,    true);
+    assert.strictEqual(result.firmware, '1.2');
+    assert.strictEqual(result.battery,  4);
+    assert.strictEqual(result.name,     'TIM');
+  });
+
+  test('getZoneBlock(0) invia CMD=0x07 SUB=0x01 con flag=0x01 e decodifica', async () => {
+    const { conn, session } = await readySession();
+
+    const zonesP = session.getZoneBlock(0);
+    await Promise.resolve();
+
+    const sent = parseSent(conn.sent.at(-1));
+    assert.strictEqual(sent.cmd, 0x07);
+    assert.strictEqual(sent.sub, 0x01);
+    assert.strictEqual(sent.data[0], 0x01); // flag = normal block
+    assert.strictEqual(sent.data[1], 0x00); // startIdx = 0
+    assert.strictEqual(sent.data[2], 7);    // blockSize default
+
+    // Risposta con 2 zone
+    const respData = Buffer.from([
+      0x01, 0x00, 0x02,           // found, offset=0, count=2
+      0x00, 0x01, 0x01, 0x00,     // zona 0: attiva, alarm
+      0x01, 0x00, 0x00, 0x00,     // zona 1: non attiva, standby
+    ]);
+    conn.emit('frame', serverFrame(0x07, 0x81, respData));
+
+    const result = await zonesP;
+    assert.strictEqual(result.found, true);
+    assert.strictEqual(result.zones.length, 2);
+    assert.strictEqual(result.zones[0].id, 0);
+    assert.strictEqual(result.zones[0].active, true);
+    assert.strictEqual(result.zones[0].status, 1);
+    assert.strictEqual(result.zones[1].active, false);
+  });
+
+  test('getZoneBlock con isLast=true → flag=0x0F nel frame', async () => {
+    const { conn, session } = await readySession();
+
+    session.getZoneBlock(7, 7, true);
+    await Promise.resolve();
+
+    const sent = parseSent(conn.sent.at(-1));
+    assert.strictEqual(sent.data[0], 0x0F); // last block flag
+    assert.strictEqual(sent.data[1], 7);    // startIdx
+  });
+
+  test('getText(GROUP, 0) invia CMD=0x03 SUB=0x00 con tipo e ID', async () => {
+    const { conn, session } = await readySession();
+
+    const textP = session.getText(2, 0); // GROUP (type=2), id=0
+    await Promise.resolve();
+
+    const sent = parseSent(conn.sent.at(-1));
+    assert.strictEqual(sent.cmd, 0x03);
+    assert.strictEqual(sent.sub, 0x00);
+    assert.strictEqual(sent.data[0], 2); // type = GROUP
+    assert.strictEqual(sent.data.readUInt16LE(1), 0); // id = 0
+
+    // Risposta con nome "Casa"
+    const respData = Buffer.concat([
+      Buffer.from([0x02, 0x00, 0x00]),    // type=GROUP, id=0 LE16
+      Buffer.from('Casa\0', 'ascii'),
+    ]);
+    conn.emit('frame', serverFrame(0x03, 0x80, respData));
+
+    const result = await textP;
+    assert.strictEqual(result.type, 2);
+    assert.strictEqual(result.id,   0);
+    assert.strictEqual(result.text, 'Casa');
+  });
+
+  test('getText con ID > 255 viene codificato correttamente in LE16', async () => {
+    const { conn, session } = await readySession();
+
+    session.getText(3, 0x0102); // ZONE, id=258
+    await Promise.resolve();
+
+    const sent = parseSent(conn.sent.at(-1));
+    assert.strictEqual(sent.data.readUInt16LE(1), 0x0102);
+  });
+});

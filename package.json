@@ -7,6 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test backend/test/protocol.test.js backend/test/connection.test.js backend/test/session.test.js"
+    "test": "node --test backend/test/protocol.test.js backend/test/connection.test.js backend/test/session.test.js backend/test/commands.test.js backend/test/config.test.js",
+    "start": "node --env-file=.env backend/server.js"
   }
 }

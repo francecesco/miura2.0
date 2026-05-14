@@ -19,6 +19,12 @@
 
 const { EventEmitter } = require('events');
 const { buildFrame }   = require('./protocol');
+const {
+  decodeGroupStatus,
+  decodeSysinfo,
+  decodeZoneBlock,
+  decodeText,
+} = require('./commands');
 
 const KEEPALIVE_MS  = 20_000;  // §8: inattività TX
 const CMD_TIMEOUT_MS = 25_000; // §16: timeout risposta
@@ -32,17 +38,6 @@ const LOGIN_ERROR_MSG = {
   254: 'wrong code',
   255: 'user not found',
 };
-
-function decodeGroupStatus(data) {
-  if (!data || data.length < 10) return null;
-  return {
-    active:     data.readUInt16LE(0),
-    partial:    data.readUInt16LE(2),
-    alarmMem:   data.readUInt16LE(4),
-    zoneGroups: data.readUInt16LE(6),
-    zoneFail:   data.readUInt16LE(8),
-  };
-}
 
 class Session extends EventEmitter {
   #conn;
@@ -173,6 +168,60 @@ class Session extends EventEmitter {
       buildFrame(0x06, 0x01, data),
       0x06, [0x80, 0x81],
       f => decodeGroupStatus(f.data),
+    );
+  }
+
+  /**
+   * Richiede le informazioni di sistema (firmware, batteria, nome impianto, stato).
+   * @returns {Promise<{armed,partial,trouble,alarm,firmware,battery,name}|null>}
+   */
+  async getSysinfo() {
+    await this.#waitReady();
+    return this.#enqueueCommand(
+      buildFrame(0x0F, 0x01, Buffer.alloc(0)),
+      0x0F, [0x80],
+      f => decodeSysinfo(f.data),
+    );
+  }
+
+  /**
+   * Richiede un blocco di zone (max 7 per blocco).
+   * Inviare più chiamate consecutive con startIdx crescente per caricare tutte le zone.
+   *
+   * @param {number} startIdx   indice di partenza (0, 7, 14, …)
+   * @param {number} [blockSize=7]
+   * @param {boolean} [isLast=false]  true sull'ultima richiesta del batch
+   * @returns {Promise<{found: boolean, zones: Array<{id,active,status}>}|null>}
+   */
+  async getZoneBlock(startIdx, blockSize = 7, isLast = false) {
+    await this.#waitReady();
+    const flag = isLast ? 0x0F : 0x01;
+    const data = Buffer.from([flag, startIdx & 0xFF, blockSize & 0xFF]);
+    return this.#enqueueCommand(
+      buildFrame(0x07, 0x01, data),
+      0x07, [0x81],
+      f => decodeZoneBlock(f.data),
+    );
+  }
+
+  /**
+   * Richiede il nome testuale di un'entità (area, gruppo, zona, ecc.).
+   *
+   * @param {number} entityType  1=area, 2=gruppo, 3=zona, 4=telecomando, 8=timer
+   * @param {number} entityId    ID dell'elemento (0-based)
+   * @returns {Promise<{type, id, text}|null>}
+   */
+  async getText(entityType, entityId) {
+    await this.#waitReady();
+    const data = Buffer.from([
+      entityType & 0xFF,
+      entityId & 0xFF,
+      (entityId >> 8) & 0xFF,
+    ]);
+    return this.#enqueueCommand(
+      buildFrame(0x03, 0x00, data),
+      0x03, [0x80, 0x81],
+      f => decodeText(f.data),
     );
   }
 

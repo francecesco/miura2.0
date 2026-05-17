@@ -1,0 +1,16 @@
+services:
+  miura:
+    build: .
+    image: miura2:latest
+    container_name: miura
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

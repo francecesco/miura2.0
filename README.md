@@ -10,10 +10,10 @@ Deployabile via Docker su CasaOS / ZimaBoard. Nessuna dipendenza da cloud Tervis
 
 ```
 Browser (PWA)
-    │  WebSocket
+    │  WebSocket  (JSON: comandi + eventi)
     ▼
-Express + WS server       ← backend/server.js  (TODO)
-    │
+Express + WS server       ← backend/server.js
+    │  GET /health · static PWA · broadcast eventi
     ├── Session           ← backend/miura/session.js
     │     └── Connection  ← backend/miura/connection.js
     │           └── Protocol codec ← backend/miura/protocol.js
@@ -32,8 +32,10 @@ Il protocollo TCP è documentato in dettaglio in [docs/PROTOCOL.md](docs/PROTOCO
 | 1 | Reverse engineering protocollo | ✅ Completato |
 | 2 | `protocol.js` — codec puro CRC + cifratura + framing | ✅ Completato (31 test) |
 | 2 | `connection.js` — TCP client con reconnect esponenziale | ✅ Completato (15 test) |
-| 2 | `session.js` — macchina a stati login/keep-alive/comandi | ✅ Completato (11 test) |
-| 3 | `server.js` — Express + WebSocket | 🔲 TODO |
+| 2 | `session.js` — macchina a stati login/keep-alive/comandi | ✅ Completato (18 test) |
+| 2 | `commands.js` — decoder payload + costanti | ✅ Completato (22 test) |
+| 2 | `config.js` — caricamento env con validazione | ✅ Completato (9 test) |
+| 3 | `server.js` — Express + WebSocket bridge | ✅ Completato (21 test) |
 | 4 | Frontend Vue 3 + Vite + PWA | 🔲 TODO |
 | 5 | Dockerfile + docker-compose | 🔲 TODO |
 
@@ -68,12 +70,10 @@ Variabili d'ambiente:
 
 ```bash
 # Tutti i test backend (nessuna connessione reale necessaria)
-node --test backend/test/protocol.test.js
-node --test backend/test/connection.test.js
-node --test backend/test/session.test.js
+npm test
 ```
 
-Output atteso: **57 test, 0 fail**.
+Output atteso: **116 test, 0 fail** in circa 1–2 secondi.
 
 ---
 
@@ -95,7 +95,43 @@ MIURA_HOST=<ip> MIURA_PIN=<pin> node tools/protocol-probe.js --mode send --cmd a
 
 ---
 
-## Protocollo
+## Avvio server
+
+```bash
+# Copia e compila il file di configurazione, poi:
+npm start
+# → Miura 2.0 listening on :3000
+```
+
+Il server espone:
+- `GET /health` — `{ status: "ok", session: "<stato>" }`
+- `ws://host:3000` — WebSocket JSON per la PWA
+
+**Comandi WebSocket** (client → server):
+
+```jsonc
+{ "type": "getGroupStatus", "id": "r1" }
+{ "type": "getSysinfo",     "id": "r2" }
+{ "type": "arm",    "groupId": 0, "id": "r3" }
+{ "type": "disarm", "groupId": 0, "id": "r4" }
+{ "type": "getZoneBlock", "startIdx": 0, "id": "r5" }
+{ "type": "getText", "entityType": 2, "entityId": 0, "id": "r6" }
+```
+
+**Risposte e push** (server → client):
+
+```jsonc
+{ "type": "state",          "state": "ready" }
+{ "type": "result",         "id": "r1", "data": { ... } }
+{ "type": "error",          "id": "r1", "message": "..." }
+{ "type": "login-failed",   "code": 254, "message": "..." }
+{ "type": "session-expired" }
+{ "type": "push",           "cmd": 8, "sub": 136, "data": "<hex>" }
+```
+
+---
+
+## Protocollo TCP
 
 Il file [docs/PROTOCOL.md](docs/PROTOCOL.md) documenta:
 
@@ -115,11 +151,17 @@ miura2.0/
 │   ├── miura/
 │   │   ├── protocol.js      # codec puro: CRC, cifratura, buildFrame, parseFrame
 │   │   ├── connection.js    # TCP client con reconnect esponenziale
-│   │   └── session.js       # macchina a stati sessione applicativa
+│   │   ├── session.js       # macchina a stati sessione applicativa
+│   │   └── commands.js      # decoder payload (sysinfo, zone, testo) + costanti
+│   ├── config.js            # loadConfig(env) — validazione e default
+│   ├── server.js            # Express HTTP + WebSocket bridge
 │   └── test/
 │       ├── protocol.test.js
 │       ├── connection.test.js
-│       └── session.test.js
+│       ├── session.test.js
+│       ├── commands.test.js
+│       ├── config.test.js
+│       └── server.test.js
 ├── docs/
 │   └── PROTOCOL.md          # documentazione protocollo reverse-engineered
 ├── tools/

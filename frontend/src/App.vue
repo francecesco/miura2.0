@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-900 text-white flex flex-col max-w-md mx-auto">
+  <div class="h-dvh max-w-sm mx-auto bg-slate-900 text-white flex flex-col overflow-hidden">
 
     <!-- Header ──────────────────────────────────────────────────────────────── -->
     <header class="flex items-center justify-between px-4 py-3 bg-slate-800/80 backdrop-blur border-b border-slate-700/60">
@@ -36,7 +36,7 @@
     </header>
 
     <!-- Contenuto principale ─────────────────────────────────────────────── -->
-    <main class="flex-1 px-4 py-5 space-y-4">
+    <main class="flex-1 overflow-y-auto px-4 py-5 space-y-4">
 
       <!-- Banner errori ────────────────────────────────────────────────────── -->
       <div v-if="loginError"

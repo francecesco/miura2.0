@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/public/icons/icon.svg" alt="Miura" width="96" />
+</p>
+
 # Miura 2.0
 
 Replica PWA self-hosted dell'applicazione mobile **Miura Tervis** per la gestione di impianti di allarme Tervis, dismessa dall'App Store.

@@ -2,30 +2,30 @@
   <div class="min-h-screen bg-slate-900 text-white flex flex-col max-w-md mx-auto">
 
     <!-- Header ──────────────────────────────────────────────────────────────── -->
-    <header class="flex items-center justify-between px-5 py-4 bg-slate-800/80 backdrop-blur border-b border-slate-700/60">
-      <!-- Indicatore connessione -->
-      <div class="flex items-center gap-2 min-w-[80px]">
-        <span :class="[
-          'w-2 h-2 rounded-full flex-shrink-0 transition-colors',
-          wsConnected ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'
-        ]" />
-        <span class="text-xs text-slate-400 capitalize">
-          {{ wsConnected ? sessionState : 'offline' }}
-        </span>
+    <header class="flex items-center justify-between px-4 py-3 bg-slate-800/80 backdrop-blur border-b border-slate-700/60">
+      <!-- Logo + nome sistema -->
+      <div class="flex items-center gap-2.5">
+        <img src="/icons/icon.svg" alt="" class="w-8 h-8 rounded-lg flex-shrink-0" />
+        <div class="leading-tight">
+          <h1 class="font-semibold text-sm tracking-wide">
+            {{ sysinfo?.name || 'Miura 2.0' }}
+          </h1>
+          <div v-if="sysinfo" class="text-xs text-slate-500">
+            fw {{ sysinfo.firmware }}
+          </div>
+        </div>
       </div>
 
-      <!-- Nome sistema -->
-      <h1 class="font-semibold text-base tracking-wide">
-        {{ sysinfo?.name || 'Miura 2.0' }}
-      </h1>
-
-      <!-- Batteria + firmware -->
-      <div class="text-xs text-slate-400 text-right min-w-[80px]">
-        <span v-if="sysinfo">
-          <span class="mr-1">🔋</span>{{ sysinfo.battery }}
-          <span class="block text-slate-600">fw {{ sysinfo.firmware }}</span>
-        </span>
-        <span v-else>–</span>
+      <!-- Batteria + stato connessione -->
+      <div class="flex items-center gap-3 text-xs text-slate-400">
+        <span v-if="sysinfo">🔋 {{ sysinfo.battery }}</span>
+        <div class="flex items-center gap-1.5">
+          <span :class="[
+            'w-2 h-2 rounded-full flex-shrink-0 transition-colors',
+            wsConnected ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'
+          ]" />
+          <span class="capitalize">{{ wsConnected ? sessionState : 'offline' }}</span>
+        </div>
       </div>
     </header>
 

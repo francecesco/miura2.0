@@ -330,7 +330,7 @@ describe('Session — coda comandi e reconnect', () => {
     const statusP = session.getGroupStatus();
     await Promise.resolve(); // flush dispatch
 
-    conn.emit('frame', serverFrame(0x06, 0x80, responseData));
+    conn.emit('frame', serverFrame(0x06, 0x82, responseData));
 
     const result = await statusP;
     assert.strictEqual(result.active,     0x0003);
@@ -403,7 +403,7 @@ describe('Session — getSysinfo / getZoneBlock / getText', () => {
       Buffer.from([0x01, 0x00, 0x00, 0x01, 0x02, 0x04]),
       Buffer.from('TIM\0', 'ascii'),
     ]);
-    conn.emit('frame', serverFrame(0x0F, 0x80, respData));
+    conn.emit('frame', serverFrame(0x0F, 0x81, respData));
 
     const result = await sysinfoP;
     assert.strictEqual(result.armed,    true);

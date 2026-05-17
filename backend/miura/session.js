@@ -134,7 +134,7 @@ class Session extends EventEmitter {
     await this.#waitReady();
     return this.#enqueueCommand(
       buildFrame(0x06, 0x02, Buffer.alloc(0)),
-      0x06, [0x80],
+      0x06, [0x82],
       f => decodeGroupStatus(f.data),
     );
   }
@@ -163,10 +163,10 @@ class Session extends EventEmitter {
   async disarm(groupId) {
     await this.#waitReady();
     const mask = 1 << groupId;
-    const data = Buffer.from([(mask & 0xFF), (mask >> 8) & 0xFF, 0x01]);
+    const data = Buffer.from([(mask & 0xFF), (mask >> 8) & 0xFF]);
     return this.#enqueueCommand(
-      buildFrame(0x06, 0x01, data),
-      0x06, [0x80, 0x81],
+      buildFrame(0x06, 0x00, data),
+      0x06, [0x80],
       f => decodeGroupStatus(f.data),
     );
   }
@@ -179,7 +179,7 @@ class Session extends EventEmitter {
     await this.#waitReady();
     return this.#enqueueCommand(
       buildFrame(0x0F, 0x01, Buffer.alloc(0)),
-      0x0F, [0x80],
+      0x0F, [0x81],
       f => decodeSysinfo(f.data),
     );
   }
@@ -322,7 +322,7 @@ class Session extends EventEmitter {
 
   #sendLoginRequest() {
     const pinBytes = Buffer.from(this.#pin, 'ascii');
-    const data = Buffer.concat([Buffer.from([0x00]), pinBytes, Buffer.from([0x00])]);
+    const data = Buffer.concat([pinBytes, Buffer.from([0x00])]);
     this.#conn.send(buildFrame(0x01, 0x00, data));
   }
 
@@ -336,6 +336,9 @@ class Session extends EventEmitter {
       this.#handleSessionExpired();
       return;
     }
+
+    // Risposta keepalive (CMD=1 SUB=0x82) — silenzio, non è un push utente
+    if (frame.cmd === 0x01 && frame.sub === 0x82) return;
 
     // Risposta a comando in volo
     if (this.#pending) {

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --test backend/test/protocol.test.js backend/test/connection.test.js backend/test/session.test.js backend/test/commands.test.js backend/test/config.test.js backend/test/server.test.js",
-    "start": "node --env-file=.env backend/server.js"
+    "start": "sh -c 'set -a && [ -f .env ] && . .env; set +a; exec node backend/server.js'"
   },
   "dependencies": {
     "express": "^5.2.1",

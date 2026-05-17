@@ -48,7 +48,7 @@
       <!-- Card stato globale ───────────────────────────────────────────────── -->
       <div :class="['rounded-2xl p-8 text-center transition-all duration-500', statusCardClass]">
         <!-- Skeleton -->
-        <template v-if="loading && !sysinfo">
+        <template v-if="loading && !groupStatus">
           <div class="h-12 w-32 mx-auto rounded-lg bg-slate-700 animate-pulse" />
         </template>
 
@@ -56,7 +56,7 @@
           <div class="text-5xl font-black tracking-tight uppercase">
             {{ statusLabel }}
           </div>
-          <div v-if="sysinfo?.alarm"
+          <div v-if="hasAlarm"
                class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-red-200 animate-pulse">
             🚨 Allarme in corso
           </div>
@@ -64,7 +64,7 @@
                class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-300">
             ⚠️ Anomalia rilevata
           </div>
-          <div v-else-if="sysinfo?.partial"
+          <div v-else-if="groupStatus?.partial"
                class="mt-3 text-sm font-medium text-orange-300">
             Parziale
           </div>
@@ -148,18 +148,22 @@ const {
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
+// Fonte di verità: groupStatus.active (PROTOCOL.md §14.2 — sysinfo.armed non affidabile)
+const isArmed  = computed(() => !!(groupStatus.value?.active))
+const hasAlarm = computed(() => !!(sysinfo.value?.alarm))
+
 const statusLabel = computed(() => {
-  if (!sysinfo.value) return wsConnected.value ? '…' : 'Offline'
-  if (sysinfo.value.alarm)   return 'Allarme'
-  if (sysinfo.value.armed)   return 'Armato'
+  if (!groupStatus.value) return wsConnected.value ? '…' : 'Offline'
+  if (hasAlarm.value)  return 'Allarme'
+  if (isArmed.value)   return 'Armato'
   return 'Disarmato'
 })
 
 const statusCardClass = computed(() => {
-  if (!sysinfo.value) return 'bg-slate-800 border border-slate-700'
-  if (sysinfo.value.alarm)
+  if (!groupStatus.value) return 'bg-slate-800 border border-slate-700'
+  if (hasAlarm.value)
     return 'bg-red-950 border-2 border-red-500'
-  if (sysinfo.value.armed)
+  if (isArmed.value)
     return 'bg-red-950/60 border border-red-800/60'
   return 'bg-emerald-950/60 border border-emerald-800/60'
 })

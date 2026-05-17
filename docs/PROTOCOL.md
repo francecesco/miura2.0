@@ -265,26 +265,68 @@ Nota: la classe `Z.h` gestisce SUB=0x80; `Z.b` gestisce SUB=0x81; `Z.j` gestisce
 
 Fonte: `Y/c.java` (metodo `a()`, case 128), `Z/c.java` (metodo `t()`), `Z/h.java`.
 
-### 9.3 Arm / Disarm Command (Z.a)
+### 9.3 Arm Command (Z.a) ✅
 ```
 CMD=0x06  SUB=0x01
-Payload data:
+Payload data (3 byte):
   [group_mask_lo] [group_mask_hi]  ← Maschera 16-bit del gruppo (1 << groupID)
-  [action]                          ← 0x00 = arm; 0x01 = disarm
+  [0x00]                            ← action fisso = 0
 ```
 - `group_mask = 1 << groupID` (es. gruppo 0 → 0x0001, gruppo 1 → 0x0002)
+- **Wire esempio (arm gruppo 0):**
+  ```
+  2B 2A 2B 09 F1 00 06 01 01 00 00 F3 23
+  ```
 
-### 9.4 Arm / Disarm Response (Z.b o Z.f o Z.h)
+### 9.3b Disarm Command (Z.g) ✅
 ```
-CMD=0x06  SUB=0x80 o 0x81
-Payload data (10+ byte):
-  [active_lo][active_hi] ... (stessa struttura di §9.2)
-  [result]   ← esito operazione
+CMD=0x06  SUB=0x00
+Payload data (2 byte):
+  [group_mask_lo] [group_mask_hi]  ← Maschera 16-bit del gruppo (1 << groupID)
+```
+- **Nessun byte `action`** — il SUB distingue arm (0x01) da disarm (0x00)
+- **Wire esempio (disarm gruppo 0):**
+  ```
+  2B 2A 2B 08 F1 00 06 00 01 00 22 14
+  ```
+
+> **Nota critica**: `Z.a` con action=0x01 (quello che sembrava "disarm") è un'operazione diversa (arm parziale / arm con flag). Il vero disarm usa `Z.g`, CMD=0x06 **SUB=0x00**, senza byte action. Confuso dalle sorgenti decompilate prima della validazione live.
+
+Fonte: `Z/a.java`, `Z/g.java`, `X/a.java:459` (arm → `Y1()`), `X/a.java:699` (disarm → `K1(new Z.g(...))`).
+
+### 9.4 Arm / Disarm Response — VALIDATO ✅
+
+Confermato su traffico reale (2026-05-17):
+
+**ARM response:**
+```
+CMD=0x06  SUB=0x81       ← risposta a SUB=0x01 (bit7 set = response)
+Payload (11 byte):
+  [active_lo][active_hi] ... (stessa struttura di §9.2, 10 byte)
+  [result]                ← 0x00 = arm completato
+```
+- Wire: `cmd=0x06 sub=0x81 data=0100000000000100000000`
+- Dopo arm: `active=0x0001`, `result=0x00`
+
+**DISARM response:**
+```
+CMD=0x06  SUB=0x80       ← risposta a SUB=0x00 (bit7 set = response)
+Payload (10 byte):
+  [active_lo][active_hi] ... (stessa struttura di §9.2, 10 byte)
+```
+- Wire: `cmd=0x06 sub=0x80 data=00000000000001000000`
+- Dopo disarm: `active=0x0000`
+
+**State-change broadcast (unsolicited):**
+Dopo ogni arm/disarm, la centrale invia un push non richiesto:
+```
+CMD=0x06  SUB=0x01  (dopo arm)   — active=0x0001
+CMD=0x06  SUB=0x00  (dopo disarm) — active=0x0000
 ```
 
-> ⚠️ **TODO — validare con cattura traffico reale**: non è chiaro quale esatto SUB viene ritornato dopo un arm/disarm, né il significato preciso di `result`. Usare `protocol-probe.js --send arm`.
+**Regola generale SUB response**: `response_sub = request_sub | 0x80`
 
-Fonte: `Z/a.java`, `Z/b.java`, `Z/f.java`, `Z/h.java`, `X/a.java:459`.
+Fonte: `Z/a.java`, `Z/b.java`, `Z/g.java`, `Z/h.java`, `X/a.java:459,699`, traffico reale catturato 2026-05-17.
 
 ---
 
@@ -551,11 +593,13 @@ Tutti i valori in hex, senza cifratura (ENC=0x00).
 F1          ← tipo frame
 00          ← enc_key=0 (PLAIN — obbligatorio per il primo login)
 01          ← CMD = auth
-00          ← SUB = login request
-00          ← byte prima del PIN
+00          ← SUB = login request (inserito da buildFrame, non è un dato)
 XX XX XX XX XX XX  ← PIN in ASCII (6 byte per PIN a 6 cifre)
-00          ← byte dopo il PIN
+00          ← null terminator dopo il PIN
 XX XX       ← CRC-16 BIG-ENDIAN: (crc>>8)&0xFF poi crc&0xFF
+```
+Wire reale catturato (PIN=080893): `2B 2A 2B 0D F1 00 01 00 30 38 30 38 39 33 00 A9 B1`
+```
 ```
 
 ### Wire frame della Group Status Request ✅
@@ -569,17 +613,24 @@ F1               ← tipo frame
 XX XX            ← CRC-16 BIG-ENDIAN: HIGH byte, LOW byte
 ```
 
-### Wire frame dell'Arm Command (gruppo 0)
+### Wire frame Arm / Disarm (gruppo 0) ✅
 ```
+ARM:
 2B 2A 2B         ← magic
 09               ← payload length = 9
-F1               ← tipo frame
-00               ← enc_key = 0 (plain)
-06               ← CMD = groups
-01               ← SUB = write/set
+F1 00            ← tipo frame, enc_key = 0 (plain)
+06 01            ← CMD=groups, SUB=arm
 01 00            ← group_mask = 1 (gruppo 0), LE16
-00               ← action = 0 (arm)
-XX XX            ← CRC-16 BIG-ENDIAN: HIGH byte, LOW byte
+00               ← action fisso = 0
+F3 23            ← CRC-16 BIG-ENDIAN
+
+DISARM:
+2B 2A 2B         ← magic
+08               ← payload length = 8
+F1 00            ← tipo frame, enc_key = 0 (plain)
+06 00            ← CMD=groups, SUB=disarm (nessun action byte)
+01 00            ← group_mask = 1 (gruppo 0), LE16
+22 14            ← CRC-16 BIG-ENDIAN
 ```
 
 ---
@@ -589,11 +640,11 @@ XX XX            ← CRC-16 BIG-ENDIAN: HIGH byte, LOW byte
 I seguenti punti non sono stati ancora chiariti dai test eseguiti.
 
 1. ~~**Cifratura iniziale**~~: ✅ Risolto — client invia PLAIN, server risponde sempre cifrato
-2. **Esito arm/disarm**: SUB esatto della response e significato del campo `result` dopo CMD=6, SUB=1. Testare con `--mode send --cmd arm` e `--cmd disarm` durante una sessione attiva.
+2. ~~**Esito arm/disarm**~~: ✅ Risolto — ARM usa CMD=06 SUB=01 → response SUB=0x81 (result=0x00=ok); DISARM usa CMD=06 **SUB=0x00** (Z.g, no action byte) → response SUB=0x80. Validato live 2026-05-17.
 3. **Categoria eventi log**: valori numerici per tipo evento (armamento, disinserimento, allarme zona, guasto...). Testare con `--mode listen` mentre si generano eventi reali.
 4. **Broadcast zone change (CMD=0x10)**: verificare se il push LOG_NOTIF include informazioni sulla zona scatenante o solo la categoria generica.
 5. ~~**Struttura `e0.c` (sysinfo)**~~: ✅ Confermato parzialmente — rimangono: significato di `flags2` e di `flags1.bit4`.
-6. **Discrepanza sysinfo vs group_status**: `flags1.bit0=ARMATO` mentre `group_status.active=0`. Verificare durante un ciclo armo/disarmo reale.
+6. ~~**Discrepanza sysinfo vs group_status**~~: ✅ Confermato — `flags1.bit0` rimane `1` anche con `group_status.active=0`. Il frontend usa `groupStatus.active` come fonte di verità (§9.2).
 7. ~~**Sequenza iniziale (greeting)**~~: ✅ Confermato — la centrale non invia nessun messaggio prima del login del client.
 8. **Config response (CMD=0x0A)**: confermare che i 15 blocchi coprono tutte le aree/zone dell'impianto (non testato).
 9. **g0 peripherals (CMD=0x12)**: struttura completa dei messaggi non documentata; non necessaria per le funzioni base dell'app.

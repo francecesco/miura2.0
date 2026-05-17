@@ -60,20 +60,50 @@ git clone <repo-url> miura2.0 && cd miura2.0
 
 # 2. Crea il file di configurazione
 cp .env.example .env
-# Editare .env con IP, porta e PIN della propria centrale
+nano .env   # inserisci MIURA_HOST, MIURA_PORT, MIURA_PIN, PORT
 
 # 3. Avvia
-docker compose up -d
+docker compose up -d --build
 ```
 
 La PWA sarà disponibile su `http://<ip-casaos>:3001`.
 
+### Nota: network_mode host (raccomandato)
+
+La centrale Tervis accetta **una sola connessione TCP alla volta**. Se il container Docker usa il bridge di default, alcuni router/firewall possono bloccare la connessione in uscita dall'IP NAT del container.
+
+Per evitare problemi, usa `network_mode: host` nel `docker-compose.yml` (il container condivide la rete dell'host direttamente):
+
+```yaml
+services:
+  miura:
+    build: .
+    image: miura2:latest
+    container_name: miura
+    network_mode: host        # consigliato su CasaOS/ZimaBoard
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+```
+
+> Con `network_mode: host` la sezione `ports:` non è necessaria — la porta è esposta direttamente sull'host.
+
+### Sessione unica
+
+La centrale Tervis supporta **una sola sessione TCP attiva**. Se l'app non riesce a connettersi (stato `logging_in` bloccato, nessun `[RX]` nei log), verifica che non ci siano altre istanze del server in esecuzione sullo stesso host o su altri dispositivi.
+
 ### Aggiornamento
 
 ```bash
-docker compose down
-docker compose build --no-cache
-docker compose up -d
+cd miura2.0
+git pull
+docker compose up -d --build
 ```
 
 ### Log e stato

@@ -66,7 +66,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-La PWA sarà disponibile su `http://<ip-casaos>:3000`.
+La PWA sarà disponibile su `http://<ip-casaos>:3001`.
 
 ### Aggiornamento
 
@@ -81,7 +81,7 @@ docker compose up -d
 ```bash
 docker compose logs -f          # log in tempo reale
 docker compose ps               # stato container e healthcheck
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 ```
 
 ---
@@ -100,7 +100,7 @@ Variabili d'ambiente:
 | `MIURA_HOST` | — | IP o hostname della centrale (obbligatorio) |
 | `MIURA_PORT` | `5400` | Porta TCP |
 | `MIURA_PIN` | — | Codice di accesso utente |
-| `PORT` | `3000` | Porta HTTP del server |
+| `PORT` | `3001` | Porta HTTP del server |
 | `DEBUG_PROTOCOL` | `0` | Se `1`, logga hex TX/RX su stderr |
 
 ---
@@ -111,7 +111,7 @@ Variabili d'ambiente:
 npm install
 cd frontend && npm install && cd ..
 
-# Backend (porta 3000) + frontend dev server (porta 5173, con proxy)
+# Backend (porta 3001) + frontend dev server (porta 5173, con proxy)
 npm start &
 cd frontend && npm run dev
 ```
@@ -152,12 +152,12 @@ MIURA_HOST=<ip> MIURA_PIN=<pin> node tools/protocol-probe.js --mode send --cmd a
 ```bash
 # Copia e compila il file di configurazione, poi:
 npm start
-# → Miura 2.0 listening on :3000
+# → Miura 2.0 listening on :3001
 ```
 
 Il server espone:
 - `GET /health` — `{ status: "ok", session: "<stato>" }`
-- `ws://host:3000` — WebSocket JSON per la PWA
+- `ws://host:3001` — WebSocket JSON per la PWA
 
 **Comandi WebSocket** (client → server):
 

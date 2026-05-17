@@ -25,9 +25,9 @@ RUN addgroup -S miura && adduser -S miura -G miura
 USER miura
 
 ENV NODE_ENV=production
-EXPOSE 3000
+EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:${PORT:-3001}/health || exit 1
 
 CMD ["node", "backend/server.js"]

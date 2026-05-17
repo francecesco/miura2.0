@@ -4,7 +4,7 @@ services:
     image: miura2:latest
     container_name: miura
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
+      - "${PORT:-3001}:${PORT:-3001}"
     env_file:
       - .env
     restart: unless-stopped

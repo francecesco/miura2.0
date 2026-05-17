@@ -36,15 +36,49 @@ Il protocollo TCP è documentato in dettaglio in [docs/PROTOCOL.md](docs/PROTOCO
 | 2 | `commands.js` — decoder payload + costanti | ✅ Completato (22 test) |
 | 2 | `config.js` — caricamento env con validazione | ✅ Completato (9 test) |
 | 3 | `server.js` — Express + WebSocket bridge | ✅ Completato (21 test) |
-| 4 | Frontend Vue 3 + Vite + PWA | 🔲 TODO |
-| 5 | Dockerfile + docker-compose | 🔲 TODO |
+| 4 | Frontend Vue 3 + Vite + PWA | ✅ Completato |
+| 5 | Dockerfile + docker-compose | ✅ Completato |
 
 ---
 
 ## Requisiti
 
-- **Node.js 20+**
+- **Docker** (deploy raccomandato) oppure **Node.js 20+** per sviluppo locale
 - Accesso di rete alla centrale Tervis (TCP, porta configurabile)
+
+---
+
+## Deploy con Docker (CasaOS / ZimaBoard)
+
+```bash
+# 1. Clona il repository
+git clone <repo-url> miura2.0 && cd miura2.0
+
+# 2. Crea il file di configurazione
+cp .env.example .env
+# Editare .env con IP, porta e PIN della propria centrale
+
+# 3. Avvia
+docker compose up -d
+```
+
+La PWA sarà disponibile su `http://<ip-casaos>:3000`.
+
+### Aggiornamento
+
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+### Log e stato
+
+```bash
+docker compose logs -f          # log in tempo reale
+docker compose ps               # stato container e healthcheck
+curl http://localhost:3000/health
+```
 
 ---
 
@@ -62,7 +96,21 @@ Variabili d'ambiente:
 | `MIURA_HOST` | — | IP o hostname della centrale (obbligatorio) |
 | `MIURA_PORT` | `5400` | Porta TCP |
 | `MIURA_PIN` | — | Codice di accesso utente |
+| `PORT` | `3000` | Porta HTTP del server |
 | `DEBUG_PROTOCOL` | `0` | Se `1`, logga hex TX/RX su stderr |
+
+---
+
+## Sviluppo locale
+
+```bash
+npm install
+cd frontend && npm install && cd ..
+
+# Backend (porta 3000) + frontend dev server (porta 5173, con proxy)
+npm start &
+cd frontend && npm run dev
+```
 
 ---
 
@@ -95,7 +143,7 @@ MIURA_HOST=<ip> MIURA_PIN=<pin> node tools/protocol-probe.js --mode send --cmd a
 
 ---
 
-## Avvio server
+## Avvio server (senza Docker)
 
 ```bash
 # Copia e compila il file di configurazione, poi:
@@ -162,10 +210,21 @@ miura2.0/
 │       ├── commands.test.js
 │       ├── config.test.js
 │       └── server.test.js
+├── frontend/
+│   ├── src/
+│   │   ├── App.vue          # UI principale: stato, arm/disarm, zone
+│   │   ├── composables/
+│   │   │   └── useWs.js     # WebSocket singleton con reconnect
+│   │   └── main.js
+│   ├── index.html
+│   └── vite.config.js
 ├── docs/
 │   └── PROTOCOL.md          # documentazione protocollo reverse-engineered
 ├── tools/
 │   └── protocol-probe.js    # CLI diagnostica contro centrale reale
+├── Dockerfile               # multi-stage build (Node 20 alpine, utente non-root)
+├── docker-compose.yml       # deploy CasaOS/ZimaBoard
+├── .dockerignore
 ├── .env.example
 └── README.md
 ```

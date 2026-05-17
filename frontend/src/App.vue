@@ -16,15 +16,21 @@
         </div>
       </div>
 
-      <!-- Batteria + stato connessione -->
+      <!-- Batteria + stato + countdown -->
       <div class="flex items-center gap-3 text-xs text-slate-400">
         <span v-if="sysinfo">🔋 {{ sysinfo.battery }}</span>
+        <span v-if="isConnected && countdown > 0"
+              class="tabular-nums text-slate-500">
+          {{ countdownFormatted }}
+        </span>
         <div class="flex items-center gap-1.5">
           <span :class="[
             'w-2 h-2 rounded-full flex-shrink-0 transition-colors',
-            wsConnected ? 'bg-emerald-400' : 'bg-red-400 animate-pulse'
+            wsConnected
+              ? (isConnected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse')
+              : 'bg-red-400 animate-pulse'
           ]" />
-          <span class="capitalize">{{ wsConnected ? sessionState : 'offline' }}</span>
+          <span class="capitalize">{{ displayState }}</span>
         </div>
       </div>
     </header>
@@ -47,13 +53,11 @@
 
       <!-- Card stato globale ───────────────────────────────────────────────── -->
       <div :class="['rounded-2xl p-8 text-center transition-all duration-500', statusCardClass]">
-        <!-- Skeleton -->
         <template v-if="loading && !groupStatus">
           <div class="h-12 w-32 mx-auto rounded-lg bg-slate-700 animate-pulse" />
         </template>
-
         <template v-else>
-          <div class="text-5xl font-black tracking-tight uppercase">
+          <div :class="['text-5xl font-black tracking-tight uppercase', !isConnected && 'opacity-40']">
             {{ statusLabel }}
           </div>
           <div v-if="hasAlarm"
@@ -79,7 +83,8 @@
         </div>
 
         <div v-for="g in visibleGroups" :key="g.id"
-             class="rounded-xl bg-slate-800 border border-slate-700/60 px-4 py-3.5 flex items-center justify-between gap-4 transition-colors">
+             :class="['rounded-xl bg-slate-800 border border-slate-700/60 px-4 py-3.5 flex items-center justify-between gap-4 transition-all',
+                      !isConnected && 'opacity-40']">
           <div>
             <div class="font-medium text-sm">Gruppo {{ g.id }}</div>
             <div :class="['text-xs mt-0.5', g.armed ? 'text-red-400' : 'text-emerald-400']">
@@ -90,23 +95,19 @@
           <button
             v-if="g.armed"
             @click="handleDisarm(g.id)"
-            :disabled="cmdInProgress"
+            :disabled="cmdInProgress || !isConnected"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors
                    bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-500
                    disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Disarma
-          </button>
+          >Disarma</button>
           <button
             v-else
             @click="handleArm(g.id)"
-            :disabled="cmdInProgress"
+            :disabled="cmdInProgress || !isConnected"
             class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors
                    bg-red-700 hover:bg-red-600 active:bg-red-500
                    disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Arma
-          </button>
+          >Arma</button>
         </div>
       </template>
 
@@ -120,15 +121,38 @@
 
     <!-- Footer ──────────────────────────────────────────────────────────────── -->
     <footer class="px-4 pb-6 pt-2 space-y-3">
-      <button
-        @click="refresh"
-        :disabled="loading || !wsConnected"
-        class="w-full py-3 rounded-xl text-sm font-semibold transition-colors
-               bg-slate-700 hover:bg-slate-600 active:bg-slate-500
-               disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {{ loading ? 'Caricamento…' : 'Aggiorna' }}
-      </button>
+
+      <!-- Disconnetti + Aggiorna (quando connesso) -->
+      <template v-if="isConnected">
+        <div class="flex gap-2">
+          <button
+            @click="refresh"
+            :disabled="loading"
+            class="flex-1 py-3 rounded-xl text-sm font-semibold transition-colors
+                   bg-slate-700 hover:bg-slate-600 active:bg-slate-500
+                   disabled:opacity-40 disabled:cursor-not-allowed"
+          >{{ loading ? 'Caricamento…' : 'Aggiorna' }}</button>
+          <button
+            @click="handleDisconnect"
+            class="flex-1 py-3 rounded-xl text-sm font-semibold transition-colors
+                   bg-slate-700 hover:bg-slate-600 active:bg-slate-500"
+          >Disconnetti</button>
+        </div>
+      </template>
+
+      <!-- Connetti (quando non connesso) -->
+      <template v-else>
+        <button
+          @click="handleConnect"
+          :disabled="isConnecting || !wsConnected"
+          class="w-full py-3 rounded-xl text-sm font-semibold transition-colors
+                 bg-blue-700 hover:bg-blue-600 active:bg-blue-500
+                 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {{ isConnecting ? 'Connessione…' : 'Connetti' }}
+        </button>
+      </template>
+
     </footer>
 
   </div>
@@ -143,32 +167,56 @@ const {
   sysinfo, groupStatus,
   loginError, sessionExpired,
   loading, cmdInProgress,
+  countdown,
   arm, disarm, refresh,
+  connectSession, disconnectSession,
 } = useAlarm()
 
-// ─── Computed ─────────────────────────────────────────────────────────────────
+// ─── Stato sessione ────────────────────────────────────────────────────────────
 
-// Fonte di verità: groupStatus.active (PROTOCOL.md §14.2 — sysinfo.armed non affidabile)
+const isConnected  = computed(() => sessionState.value === 'ready')
+const isConnecting = computed(() =>
+  ['connecting', 'logging_in', 'reconnecting'].includes(sessionState.value))
+
+const displayState = computed(() => {
+  if (!wsConnected.value) return 'offline'
+  const map = {
+    idle:        'non connesso',
+    closed:      'non connesso',
+    connecting:  'connessione…',
+    logging_in:  'login…',
+    reconnecting:'riconnessione…',
+    ready:       'pronto',
+  }
+  return map[sessionState.value] ?? sessionState.value
+})
+
+const countdownFormatted = computed(() => {
+  const m = Math.floor(countdown.value / 60)
+  const s = String(countdown.value % 60).padStart(2, '0')
+  return `${m}:${s}`
+})
+
+// ─── Stato allarme ─────────────────────────────────────────────────────────────
+
 const isArmed  = computed(() => !!(groupStatus.value?.active))
 const hasAlarm = computed(() => !!(sysinfo.value?.alarm))
 
 const statusLabel = computed(() => {
-  if (!groupStatus.value) return wsConnected.value ? '…' : 'Offline'
-  if (hasAlarm.value)  return 'Allarme'
-  if (isArmed.value)   return 'Armato'
+  if (!groupStatus.value) return isConnected.value ? '…' : '––'
+  if (hasAlarm.value) return 'Allarme'
+  if (isArmed.value)  return 'Armato'
   return 'Disarmato'
 })
 
 const statusCardClass = computed(() => {
-  if (!groupStatus.value) return 'bg-slate-800 border border-slate-700'
-  if (hasAlarm.value)
-    return 'bg-red-950 border-2 border-red-500'
-  if (isArmed.value)
-    return 'bg-red-950/60 border border-red-800/60'
+  if (!groupStatus.value || !isConnected.value)
+    return 'bg-slate-800 border border-slate-700'
+  if (hasAlarm.value) return 'bg-red-950 border-2 border-red-500'
+  if (isArmed.value)  return 'bg-red-950/60 border border-red-800/60'
   return 'bg-emerald-950/60 border border-emerald-800/60'
 })
 
-// Mostra i gruppi presenti nella maschera active | zoneGroups
 const visibleGroups = computed(() => {
   if (!groupStatus.value) return []
   const { active = 0, zoneGroups = 0 } = groupStatus.value
@@ -181,11 +229,8 @@ const visibleGroups = computed(() => {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-async function handleArm(groupId) {
-  try { await arm(groupId) } catch { /* errori gestiti dal composable */ }
-}
-
-async function handleDisarm(groupId) {
-  try { await disarm(groupId) } catch { /* errori gestiti dal composable */ }
-}
+async function handleConnect()    { try { await connectSession() }    catch { /* ignorato */ } }
+async function handleDisconnect() { try { await disconnectSession() } catch { /* ignorato */ } }
+async function handleArm(id)      { try { await arm(id) }             catch { /* ignorato */ } }
+async function handleDisarm(id)   { try { await disarm(id) }          catch { /* ignorato */ } }
 </script>

@@ -106,6 +106,25 @@ function createServer(session, cfg = {}) {
   session.on('frame', frame =>
     broadcast({ type: 'push', cmd: frame.cmd, sub: frame.sub, data: frame.data.toString('hex') }));
 
+  // ─── Auto-disconnect timer (2 minuti dalla connessione) ──────────────────
+
+  let autoDisconnectTimer = null;
+
+  function startAutoDisconnect() {
+    clearAutoDisconnect();
+    autoDisconnectTimer = setTimeout(() => {
+      autoDisconnectTimer = null;
+      session.disconnect();
+    }, 120_000);
+  }
+
+  function clearAutoDisconnect() {
+    if (autoDisconnectTimer) {
+      clearTimeout(autoDisconnectTimer);
+      autoDisconnectTimer = null;
+    }
+  }
+
   // Gestione connessione WS
   wss.on('connection', (ws) => {
     // Invia subito lo stato corrente al client appena connesso
@@ -121,6 +140,20 @@ function createServer(session, cfg = {}) {
       }
 
       const { type, id, ...params } = msg;
+
+      if (type === 'connect') {
+        startAutoDisconnect();
+        session.connect().catch(() => {});
+        ws.send(JSON.stringify({ type: 'result', id, data: null }));
+        return;
+      }
+
+      if (type === 'disconnect') {
+        clearAutoDisconnect();
+        session.disconnect();
+        ws.send(JSON.stringify({ type: 'result', id, data: null }));
+        return;
+      }
 
       try {
         const data = await dispatch(session, type, params);
@@ -155,11 +188,6 @@ if (require.main === module) {
 
   server.listen(cfg.server.port, () => {
     process.stdout.write(`Miura 2.0 listening on :${cfg.server.port}\n`);
-  });
-
-  // La sessione riprova automaticamente in caso di errore TCP
-  session.connect().catch(err => {
-    process.stderr.write(`[session] initial connect error: ${err.message}\n`);
   });
 
   // Graceful shutdown

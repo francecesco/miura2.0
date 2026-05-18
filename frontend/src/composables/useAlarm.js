@@ -16,6 +16,7 @@ const sysinfo        = ref(null)
 const groupStatus    = ref(null)
 const loginError     = ref(null)
 const sessionExpired = ref(false)
+const connectError   = ref(null)
 const loading        = ref(false)
 const cmdInProgress  = ref(false)
 const countdown      = ref(0)   // secondi rimanenti alla disconnessione automatica
@@ -26,6 +27,10 @@ let ws        = null
 let pending   = {}
 let reqCount  = 0
 let cdTimer   = null   // setInterval countdown
+
+const CONNECT_MAX_RETRIES = 2  // tentativi falliti prima di mostrare l'errore
+let connectAttempts = 0        // conta i 'reconnecting' senza aver mai raggiunto ready
+let sessionWasReady = false    // true se la sessione corrente ha raggiunto 'ready'
 
 function nextId() { return `r${++reqCount}` }
 
@@ -93,7 +98,10 @@ async function fetchStatus() {
 function connect() {
   ws = new WebSocket(WS_URL)
 
-  ws.onopen = () => { wsConnected.value = true }
+  ws.onopen = () => {
+    wsConnected.value  = true
+    connectError.value = null
+  }
 
   ws.onclose = () => {
     wsConnected.value  = false
@@ -122,8 +130,18 @@ function connect() {
       case 'state':
         sessionState.value = msg.state
         if (msg.state === 'ready') {
+          sessionWasReady    = true
+          connectAttempts    = 0
+          connectError.value = null
           fetchStatus()
           startCountdown()
+        } else if (msg.state === 'reconnecting' && !sessionWasReady) {
+          connectAttempts++
+          if (connectAttempts >= CONNECT_MAX_RETRIES) {
+            connectError.value = 'Centrale non raggiungibile — verifica l\'alimentazione'
+            connectAttempts    = 0
+            sendCmd('disconnect').catch(() => {})
+          }
         } else if (msg.state === 'idle' || msg.state === 'closed') {
           stopCountdown()
           sysinfo.value     = null
@@ -160,8 +178,19 @@ async function disarm(groupId) {
   finally { cmdInProgress.value = false }
 }
 
-function connectSession()    { return sendCmd('connect') }
-function disconnectSession() { stopCountdown(); return sendCmd('disconnect') }
+function connectSession() {
+  connectError.value = null
+  connectAttempts    = 0
+  sessionWasReady    = false
+  return sendCmd('connect')
+}
+
+function disconnectSession() {
+  stopCountdown()
+  connectAttempts = 0
+  sessionWasReady = false
+  return sendCmd('disconnect')
+}
 
 export function useAlarm() {
   return {
@@ -171,6 +200,7 @@ export function useAlarm() {
     groupStatus:    readonly(groupStatus),
     loginError:     readonly(loginError),
     sessionExpired: readonly(sessionExpired),
+    connectError:   readonly(connectError),
     loading:        readonly(loading),
     cmdInProgress:  readonly(cmdInProgress),
     countdown:      readonly(countdown),

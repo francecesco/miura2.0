@@ -51,6 +51,12 @@
         <div>Sessione scaduta — riconnessione in corso…</div>
       </div>
 
+      <div v-if="connectError"
+           class="flex items-start gap-3 rounded-xl bg-orange-950 border border-orange-700/60 px-4 py-3 text-sm text-orange-200">
+        <span class="text-lg leading-none">⚡</span>
+        <div><strong>Connessione fallita:</strong> {{ connectError }}</div>
+      </div>
+
       <!-- Card stato globale ───────────────────────────────────────────────── -->
       <div :class="['rounded-2xl p-8 text-center transition-all duration-500', statusCardClass]">
         <template v-if="loading && !groupStatus">
@@ -165,7 +171,7 @@ import { useAlarm } from './composables/useAlarm.js'
 const {
   wsConnected, sessionState,
   sysinfo, groupStatus,
-  loginError, sessionExpired,
+  loginError, sessionExpired, connectError,
   loading, cmdInProgress,
   countdown,
   arm, disarm, refresh,
